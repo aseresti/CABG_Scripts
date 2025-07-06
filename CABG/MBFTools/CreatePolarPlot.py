@@ -186,7 +186,7 @@ class CreatePolarPlot():
 
         MBFArrayName = "MBFProfile"
         TerritoryArrayName = "TerritoryProfile"
-        WallThicknessArrayName = "WallThickness"
+        #WallThicknessArrayName = "WallThickness"
 
         append_filter = vtk.vtkAppendPolyData()
         Center = []
@@ -202,7 +202,7 @@ class CreatePolarPlot():
 
             MBFProfile = slice_.GetPointData().GetArray(MBFArrayName)
             TerritoryProfile = slice_.GetPointData().GetArray(TerritoryArrayName)
-            WallThickness = slice_.GetPointData().GetArray(WallThicknessArrayName)
+            #WallThickness = slice_.GetPointData().GetArray(WallThicknessArrayName)
             pts_np = np.array([slice_.GetPoint(j) for j in range(slice_.GetNumberOfPoints())])
             center = pts_np.mean(axis=0)
             Center.append(center)
@@ -214,8 +214,9 @@ class CreatePolarPlot():
                 new_coords.append([R_map[i]*np.cos(angle), R_map[i]*np.sin(angle), 0])
             
             slice_MBF = self.CopyProfileToPolyData(slice_, MBFProfile, new_coords, MBFArrayName)
-            slice_MBF_territory = self.AddProfileToPolyData(slice_MBF, TerritoryProfile, TerritoryArrayName)
-            append_filter.AddInputData(self.AddProfileToPolyData(slice_MBF_territory, WallThickness, WallThicknessArrayName))
+            append_filter.AddInputData(self.AddProfileToPolyData(slice_MBF, TerritoryProfile, TerritoryArrayName))
+            #slice_MBF_territory = self.AddProfileToPolyData(slice_MBF, TerritoryProfile, TerritoryArrayName)
+            #append_filter.AddInputData(self.AddProfileToPolyData(slice_MBF_territory, WallThickness, WallThicknessArrayName))
         append_filter.Update()
 
         print("- Writing Average MBF, Territory, and WallThickness Maps and Regions")
