@@ -276,7 +276,7 @@ if __name__ == "__main__":
     Parser.add_argument("-SliceBase", "--SliceBase", dest= "SliceBase", required=False, type=str, default="slice_base.vtp")
     Parser.add_argument("-Myocardium", "--Myocardium", dest= "Myocardium", required=False, type=str, default="MyocardiumSurface.vtp")
     Parser.add_argument("-PathFolder", "--PathFolder", dest= "PathFolder", required= False, type=str, default="Paths")
-    Parser.add_argument("-PlotRadius", "--PlotRadius", dest= "PlotRadius", default=12.0, type=float, required= False)
+    Parser.add_argument("-PlotRadius", "--PlotRadius", dest= "PlotRadius", default=1.0, type=float, required= False)
     Parser.add_argument("-Scale", "--Scale", dest= "Scale", default="cm", type=str, required=False)
     args = Parser.parse_args()
 
