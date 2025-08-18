@@ -4,6 +4,7 @@ import numpy as np
 from matplotlib.widgets import Cursor
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
+from scipy.interpolate import CubicSpline
 from scipy.spatial.transform import Rotation as R
 from utilities import ReadVTPFile, GetCentroid, ReadVTKFile, WriteVTIFile, WriteVTPFile, ThresholdInBetween, ExtractSurface, LargestConnectedRegion
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
@@ -77,7 +78,12 @@ class InteractiveEndoSelection():
         return new_point_x, new_point_y, scalar_value
 
     def onPress(self, event):
+
+        if event.xdata is not None and event.ydata is not None:
+            self.clicked_x.append(event.xdata)
+            self.clicked_y.append(event.ydata)
         print(f'coordinate position: {event.xdata}, {event.ydata}')
+
 
     def main(self):
         
@@ -139,7 +145,8 @@ class InteractiveEndoSelection():
 
         x_circle = []
         y_circle = []
-        for theta in np.arange(0,np.pi*2, np.pi/100):
+        xs = np.arange(0,np.pi*2, np.pi/100)
+        for theta in xs:
             x_circle.append(centroid_rotated[0] + radius*np.cos(theta))
             y_circle.append(centroid_rotated[1] + radius*np.sin(theta))
 
@@ -149,8 +156,16 @@ class InteractiveEndoSelection():
         sc = ax.scatter(new_point_x, new_point_y, c=scalar_value, cmap='gray', s=10, vmin=-1000, vmax=700)
         ax.scatter(x_circle, y_circle, color='green', s = 0.8)
 
-        cursor = Cursor(ax, horizOn= True, vertOn= True, linewidth = 2.0, color = 'red')
+        for theta in np.arange(0,np.pi*2, np.pi/5):
+            x_ = centroid_rotated[0] + radius*1.5*np.cos(theta)
+            y_ = centroid_rotated[1] + radius*1.5*np.sin(theta)
+            ax.plot([centroid_rotated[0], x_], [centroid_rotated[1], y_], color = 'white')
+
+        self.clicked_x = []
+        self.clicked_y = []
+        cursor = Cursor(ax, horizOn= True, vertOn= True, linewidth = 1.0, color = 'red')
         fig.canvas.mpl_connect('button_press_event', self.onPress)
+
         
         fig.colorbar(sc, label='Scalar Value')
         ax.axis('equal')
@@ -160,6 +175,41 @@ class InteractiveEndoSelection():
         ax.set_ylim([center_rotated[1]-5, center_rotated[1]+5])
         ax.set_title('LV Projection in Short-Axis Plane')
         plt.show()
+
+        xy = np.column_stack([self.clicked_x, self.clicked_y])
+        #print(xy)
+        fig, ax = plt.subplots(figsize=(6, 6))
+
+        sc = ax.scatter(new_point_x, new_point_y, c=scalar_value, cmap='gray', s=10, vmin=-1000, vmax=700)
+        ax.scatter(x_circle, y_circle, color='green', s = 0.8)
+        
+        angles = []
+        for theta in np.arange(0,np.pi*2, np.pi/5):
+            angles.append(theta)
+            x_ = centroid_rotated[0] + radius*1.5*np.cos(theta)
+            y_ = centroid_rotated[1] + radius*1.5*np.sin(theta)
+            ax.plot([centroid_rotated[0], x_], [centroid_rotated[1], y_], color = 'white')
+
+        xy = np.vstack([xy,        xy[0][None, :]])
+        print(xy)
+        angles.append(angles[0] + np.pi*2)
+        print(angles)
+        print(len(xy), len(angles))
+        cs = CubicSpline(angles, xy, bc_type='periodic')
+        ax.plot(cs(xs)[:, 0], cs(xs)[:, 1], color = 'cyan')
+
+        ax.scatter(self.clicked_x, self.clicked_y, color='orangered', s = 20)
+        
+        fig.colorbar(sc, label='Scalar Value')
+        ax.axis('equal')
+        ax.set_xlabel('X (rotated)')
+        ax.set_ylabel('Y (rotated)')
+        ax.set_xlim([center_rotated[0]-5, center_rotated[0]+5])
+        ax.set_ylim([center_rotated[1]-5, center_rotated[1]+5])
+        ax.set_title('LV Projection in Short-Axis Plane')
+        plt.show()
+
+
 
 
 if __name__ == "__main__":
