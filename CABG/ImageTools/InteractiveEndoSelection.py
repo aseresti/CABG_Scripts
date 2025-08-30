@@ -16,6 +16,7 @@ class InteractiveEndoSelection():
         self.slice_base = "Slice_Base.vtp"
         self.slice_apex = "Slice_Apex.vtp"
         self.image_ = "SU24A_CCTA_Registered.vtk"
+        self.output = "SU24A_CCTA_Endo.vtp"
         self.image = ReadVTKFile(os.path.join(self.InputFolder, self.image_))
 
     def centerline(self):
@@ -78,12 +79,20 @@ class InteractiveEndoSelection():
         return new_point_x, new_point_y, scalar_value
 
     def onPress(self, event):
-
         if event.xdata is not None and event.ydata is not None:
             self.clicked_x.append(event.xdata)
             self.clicked_y.append(event.ydata)
         print(f'coordinate position: {event.xdata}, {event.ydata}')
 
+    def ConvertPointstoMesh(self, points):
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        
+        delaunay = vtk.vtkDelaunay2D()
+        delaunay.SetInputData(polydata)
+        delaunay.Update()
+
+        return delaunay.GetOutput()
 
     def main(self):
         
@@ -119,95 +128,102 @@ class InteractiveEndoSelection():
 
         LV_CenterLine = self.Line(point_1, point_2, N_Slices)
 
-
+        points = vtk.vtkPoints()
         # get the slice
-        center = LV_CenterLine.GetPoint(5)
-        slice_ = self.SliceWPlane(self.image, center, CL_direction)
-        BloodPool = ThresholdInBetween(slice_, scalar_array_name, 200, 700)
-        BloodPool = ExtractSurface(LargestConnectedRegion(BloodPool))
+        for n in range(3, LV_CenterLine.GetNumberOfPoints()-1):
+            center = LV_CenterLine.GetPoint(n)
+            slice_ = self.SliceWPlane(self.image, center, CL_direction)
+            BloodPool = ThresholdInBetween(slice_, scalar_array_name, 200, 700)
+            BloodPool = ExtractSurface(LargestConnectedRegion(BloodPool))
 
-        bp_centroid = GetCentroid(BloodPool)
+            bp_centroid = GetCentroid(BloodPool)
 
-        center_rotated = rotation.apply(center)
-        centroid_rotated = rotation.apply(bp_centroid)
-
-
-        new_point_x, new_point_y, scalar_value = self.Rotate(rotation, slice_, scalar_array_name)
-        new_point_x_bp, new_point_y_bp, scalar_value_bp = self.Rotate(rotation, BloodPool, scalar_array_name)
-
-        coords_2d = np.column_stack((new_point_x_bp, new_point_y_bp))
-        hull = ConvexHull(coords_2d)
-        hull_area = hull.volume
-        #Area += hull_area
-
-        radius = np.sqrt(hull_area/np.pi)
-        #print(hull_area, radius)
-
-        x_circle = []
-        y_circle = []
-        xs = np.arange(0,np.pi*2, np.pi/100)
-        for theta in xs:
-            x_circle.append(centroid_rotated[0] + radius*np.cos(theta))
-            y_circle.append(centroid_rotated[1] + radius*np.sin(theta))
+            center_rotated = rotation.apply(center)
+            centroid_rotated = rotation.apply(bp_centroid)
 
 
-        fig, ax = plt.subplots(figsize=(6, 6))
+            new_point_x, new_point_y, scalar_value = self.Rotate(rotation, slice_, scalar_array_name)
+            new_point_x_bp, new_point_y_bp, scalar_value_bp = self.Rotate(rotation, BloodPool, scalar_array_name)
 
-        sc = ax.scatter(new_point_x, new_point_y, c=scalar_value, cmap='gray', s=10, vmin=-1000, vmax=700)
-        ax.scatter(x_circle, y_circle, color='green', s = 0.8)
+            coords_2d = np.column_stack((new_point_x_bp, new_point_y_bp))
+            hull = ConvexHull(coords_2d)
+            hull_area = hull.volume
+            #Area += hull_area
 
-        for theta in np.arange(0,np.pi*2, np.pi/5):
-            x_ = centroid_rotated[0] + radius*1.5*np.cos(theta)
-            y_ = centroid_rotated[1] + radius*1.5*np.sin(theta)
-            ax.plot([centroid_rotated[0], x_], [centroid_rotated[1], y_], color = 'white')
+            radius = np.sqrt(hull_area/np.pi)
+            #print(hull_area, radius)
 
-        self.clicked_x = []
-        self.clicked_y = []
-        cursor = Cursor(ax, horizOn= True, vertOn= True, linewidth = 1.0, color = 'red')
-        fig.canvas.mpl_connect('button_press_event', self.onPress)
+            x_circle = []
+            y_circle = []
+            xs = np.arange(0,np.pi*2, np.pi/100)
+            for theta in xs:
+                x_circle.append(centroid_rotated[0] + radius*np.cos(theta))
+                y_circle.append(centroid_rotated[1] + radius*np.sin(theta))
 
-        
-        fig.colorbar(sc, label='Scalar Value')
-        ax.axis('equal')
-        ax.set_xlabel('X (rotated)')
-        ax.set_ylabel('Y (rotated)')
-        ax.set_xlim([center_rotated[0]-5, center_rotated[0]+5])
-        ax.set_ylim([center_rotated[1]-5, center_rotated[1]+5])
-        ax.set_title('LV Projection in Short-Axis Plane')
-        plt.show()
 
-        xy = np.column_stack([self.clicked_x, self.clicked_y])
-        #print(xy)
-        fig, ax = plt.subplots(figsize=(6, 6))
+            fig, ax = plt.subplots(figsize=(6, 6))
 
-        sc = ax.scatter(new_point_x, new_point_y, c=scalar_value, cmap='gray', s=10, vmin=-1000, vmax=700)
-        ax.scatter(x_circle, y_circle, color='green', s = 0.8)
-        
-        angles = []
-        for theta in np.arange(0,np.pi*2, np.pi/5):
-            angles.append(theta)
-            x_ = centroid_rotated[0] + radius*1.5*np.cos(theta)
-            y_ = centroid_rotated[1] + radius*1.5*np.sin(theta)
-            ax.plot([centroid_rotated[0], x_], [centroid_rotated[1], y_], color = 'white')
+            sc = ax.scatter(new_point_x, new_point_y, c=scalar_value, cmap='gray', s=10, vmin=-1000, vmax=700)
+            ax.scatter(x_circle, y_circle, color='green', s = 0.8)
 
-        xy = np.vstack([xy,        xy[0][None, :]])
-        print(xy)
-        angles.append(angles[0] + np.pi*2)
-        print(angles)
-        print(len(xy), len(angles))
-        cs = CubicSpline(angles, xy, bc_type='periodic')
-        ax.plot(cs(xs)[:, 0], cs(xs)[:, 1], color = 'cyan')
+            for theta in np.arange(0,np.pi*2, np.pi/5):
+                x_ = centroid_rotated[0] + radius*1.5*np.cos(theta)
+                y_ = centroid_rotated[1] + radius*1.5*np.sin(theta)
+                ax.plot([centroid_rotated[0], x_], [centroid_rotated[1], y_], color = 'white')
 
-        ax.scatter(self.clicked_x, self.clicked_y, color='orangered', s = 20)
-        
-        fig.colorbar(sc, label='Scalar Value')
-        ax.axis('equal')
-        ax.set_xlabel('X (rotated)')
-        ax.set_ylabel('Y (rotated)')
-        ax.set_xlim([center_rotated[0]-5, center_rotated[0]+5])
-        ax.set_ylim([center_rotated[1]-5, center_rotated[1]+5])
-        ax.set_title('LV Projection in Short-Axis Plane')
-        plt.show()
+            self.clicked_x = []
+            self.clicked_y = []
+            cursor = Cursor(ax, horizOn= True, vertOn= True, linewidth = 1.0, color = 'red')
+            fig.canvas.mpl_connect('button_press_event', self.onPress)
+
+            
+            fig.colorbar(sc, label='Scalar Value')
+            ax.axis('equal')
+            ax.set_xlabel('X (rotated)')
+            ax.set_ylabel('Y (rotated)')
+            ax.set_xlim([center_rotated[0]-5, center_rotated[0]+5])
+            ax.set_ylim([center_rotated[1]-5, center_rotated[1]+5])
+            ax.set_title('LV Projection in Short-Axis Plane')
+            plt.show()
+
+            xy = np.column_stack([self.clicked_x, self.clicked_y])
+            #print(xy)
+            fig, ax = plt.subplots(figsize=(6, 6))
+
+            sc = ax.scatter(new_point_x, new_point_y, c=scalar_value, cmap='gray', s=10, vmin=-1000, vmax=700)
+            ax.scatter(x_circle, y_circle, color='green', s = 0.8)
+            
+            angles = []
+            for theta in np.arange(0,np.pi*2, np.pi/5):
+                angles.append(theta)
+                x_ = centroid_rotated[0] + radius*1.5*np.cos(theta)
+                y_ = centroid_rotated[1] + radius*1.5*np.sin(theta)
+                ax.plot([centroid_rotated[0], x_], [centroid_rotated[1], y_], color = 'white')
+
+            xy = np.vstack([xy,        xy[0][None, :]])
+            print(xy)
+            angles.append(angles[0] + np.pi*2)
+            print(angles)
+            print(len(xy), len(angles))
+            cs = CubicSpline(angles, xy, bc_type='periodic')
+            ax.plot(cs(xs)[:, 0], cs(xs)[:, 1], color = 'cyan')
+
+            for i, _ in enumerate(xs):
+                points.InsertNextPoint(cs(xs)[i, 0], cs(xs)[i, 1], center_rotated[2])
+
+            ax.scatter(self.clicked_x, self.clicked_y, color='orangered', s = 20)
+            
+            fig.colorbar(sc, label='Scalar Value')
+            ax.axis('equal')
+            ax.set_xlabel('X (rotated)')
+            ax.set_ylabel('Y (rotated)')
+            ax.set_xlim([center_rotated[0]-5, center_rotated[0]+5])
+            ax.set_ylim([center_rotated[1]-5, center_rotated[1]+5])
+            ax.set_title('LV Projection in Short-Axis Plane')
+            plt.show()
+
+        OutputMesh = self.ConvertPointstoMesh(points)
+        WriteVTPFile(self.output, OutputMesh)
 
 
 
