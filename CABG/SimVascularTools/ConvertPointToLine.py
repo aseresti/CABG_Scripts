@@ -24,7 +24,7 @@ class ConvertPointToLine():
     def Line(self, centerline):
         tube_filter = vtk.vtkTubeFilter()
         tube_filter.SetInputData(centerline)
-        tube_filter.SetRadius(0.025)  # Adjust this value to change thickness
+        tube_filter.SetRadius(0.35)  # Adjust this value to change thickness
         tube_filter.SetNumberOfSides(50)  # Higher = smoother tube
         tube_filter.CappingOn()  # Close tube ends
         tube_filter.Update()
