@@ -4,6 +4,7 @@ import glob
 import vtk
 import argparse
 import numpy as np
+from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 from utilities import ReadVTPFile, WriteVTPFile, GetCentroid, ThresholdByUpper, ExtractSurface, PrintProgress
@@ -176,6 +177,28 @@ class CreatePolarPlot():
         
         return new_points[sorted_idx]
     
+    def InterpolateCoronaryCenterline(self, new_points_sorted):
+        desired_num_points = 50
+        current_num_points = len(new_points_sorted)
+        interp_indices = np.linspace(0, current_num_points - 1, desired_num_points)
+        pt_x = []; pt_y = []; pt_z = []
+        for num in range(current_num_points):
+            pt_x.append(new_points_sorted[num][0])
+            pt_y.append(new_points_sorted[num][1])
+            pt_z.append(new_points_sorted[num][2])
+        interp_func_x = interp1d(range(current_num_points), pt_x, kind='linear')
+        interp_func_y = interp1d(range(current_num_points), pt_y, kind='linear')
+        interp_func_z = interp1d(range(current_num_points), pt_z, kind='linear')
+        new_points_interp = []
+        for idx in interp_indices:
+            new_points_interp.append([
+                float(interp_func_x(idx)),
+                float(interp_func_y(idx)),
+                float(interp_func_z(idx))
+            ])
+
+            return new_points_interp
+    
     def BullsEye(self):
         CL_direction, CenterLine = self.DefineMyocardiumCenterLine(self.centeroid_base, self.centeroid_apex, 1000)
         rotation, _ = R.align_vectors([[0, 0, 1]], [CL_direction])
@@ -260,7 +283,30 @@ class CreatePolarPlot():
                     new_points.append([distance*R_map[i]*np.cos(angle), distance*R_map[i]*np.sin(angle), 0])
             
             new_points_sorted = self.ReorderCoronaryMapBasedOnCenterLine(arbitrary_points, VesselCenterline, new_points)
-            vessel_polydata = Path2Point.points_to_vtp(new_points_sorted)
+
+            desired_num_points = 30
+            current_num_points = len(new_points_sorted)
+            interp_indices = np.linspace(0, current_num_points - 1, desired_num_points)
+            pt_x = []; pt_y = []; pt_z = []
+            for num in range(current_num_points):
+                pt_x.append(new_points_sorted[num][0])
+                pt_y.append(new_points_sorted[num][1])
+                pt_z.append(new_points_sorted[num][2])
+
+            interp_func_x = interp1d(range(current_num_points), pt_x, kind='linear')
+            interp_func_y = interp1d(range(current_num_points), pt_y, kind='linear')
+            interp_func_z = interp1d(range(current_num_points), pt_z, kind='linear')
+            new_points_interp = []
+            for idx in interp_indices:
+                new_points_interp.append([
+                    float(interp_func_x(idx)),
+                    float(interp_func_y(idx)),
+                    float(interp_func_z(idx))
+                ])
+
+            #new_points_interp = self.InterpolateCoronaryCenterline(new_points_sorted)
+            
+            vessel_polydata = Path2Point.points_to_vtp(new_points_interp)
             VesselName = os.path.splitext(os.path.basename(path))[0]
             print(f"--- Converting {VesselName}")
             Vesseldir = os.path.join(self.OutputFolder, f"CoronaryMap_{VesselName}.vtp")
@@ -272,11 +318,11 @@ class CreatePolarPlot():
 if __name__ == "__main__":
     Parser = argparse.ArgumentParser()
     Parser.add_argument("-InputFolder", "--InputFolder", dest= "InputFolder", required=True, type=str)
-    Parser.add_argument("-SliceApex", "--SliceApex", dest= "SliceApex", required=False, type=str, default="slice_apex.vtp")
-    Parser.add_argument("-SliceBase", "--SliceBase", dest= "SliceBase", required=False, type=str, default="slice_base.vtp")
+    Parser.add_argument("-SliceApex", "--SliceApex", dest= "SliceApex", required=False, type=str, default="Slice_Apex.vtp")
+    Parser.add_argument("-SliceBase", "--SliceBase", dest= "SliceBase", required=False, type=str, default="Slice_Base.vtp")
     Parser.add_argument("-Myocardium", "--Myocardium", dest= "Myocardium", required=False, type=str, default="MyocardiumSurface.vtp")
     Parser.add_argument("-PathFolder", "--PathFolder", dest= "PathFolder", required= False, type=str, default="Paths")
-    Parser.add_argument("-PlotRadius", "--PlotRadius", dest= "PlotRadius", default=1.0, type=float, required= False)
+    Parser.add_argument("-PlotRadius", "--PlotRadius", dest= "PlotRadius", default=12.0, type=float, required= False)
     Parser.add_argument("-Scale", "--Scale", dest= "Scale", default="cm", type=str, required=False)
     args = Parser.parse_args()
 
