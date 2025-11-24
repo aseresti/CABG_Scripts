@@ -63,7 +63,7 @@ class CreatePolarPlot():
     def BoldLine(self, line):
         tube_filter = vtk.vtkTubeFilter()
         tube_filter.SetInputData(line)
-        tube_filter.SetRadius(0.05)
+        tube_filter.SetRadius(0.1)
         tube_filter.SetNumberOfSides(50) 
         tube_filter.CappingOn()
         tube_filter.Update()
